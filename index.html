@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dragon vs. Dinosaur Game</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; }
+    canvas { border: 1px solid; display: block; margin: 0 auto; }
+    .health-bar { height: 10px; background-color: red; }
+  </style>
+</head>
+<body>
+  <h1>Dragon vs. Dinosaur Game</h1>
+  <canvas id="game" width="800" height="600"></canvas>
+  <script>
+    const canvas = document.getElementById('game');
+    let canvasWidth = 800;
+    let canvasHeight = 600;
+    const ctx = canvas.getContext('2d');
+
+    class GameObject {
+      constructor(x, y, width, height, color, speed) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.color = color;
+        this.speed = speed;
+        this.health = 100;
+        this.cooldown = false;
+        this.alive = true;
+      }
+
+      knockback(direction, force) {
+        if (direction === 'left') this.x -= force;
+        if (direction === 'right') this.x += force;
+      }
+    
+      move(direction) {
+        switch (direction) {
+          case 'up':
+            if (this.y > 0) this.y -= this.speed;
+            break;
+          case 'down':
+            if (this.y < canvasHeight - this.height) this.y += this.speed;
+            break;
+          case 'left':
+            if (this.x > 0) this.x -= this.speed;
+            break;
+          case 'right':
+            if (this.x < canvasWidth - this.width) this.x += this.speed;
+            break;
+          default:
+            break;
+        }
+      }
+
+      draw(emoji) {
+        if (emoji) {
+          ctx.font = '100px Arial';
+          ctx.fillText(emoji, this.x, this.y + this.height);
+        } else {
+          ctx.fillStyle = this.color;
+          ctx.fillRect(this.x, this.y, this.width, this.height);
+        }
+      }
+
+      drawHealthBar() {
+        const healthBarWidth = this.width;
+        const healthBarHeight = 10;
+        const healthBarX = this.x;
+        const healthBarY = this.y - healthBarHeight - 5;
+        const currentHealthWidth = (this.health / 100) * healthBarWidth;
+
+        ctx.fillStyle = 'red';
+        ctx.fillRect(healthBarX, healthBarY, currentHealthWidth, healthBarHeight);
+      }
+
+      checkCollision(target) {
+        return (
+          this.x < target.x + target.width &&
+          this.x + this.width > target.x &&
+          this.y < target.y + target.height &&
+          this.y + this.height > target.y
+        );
+      }
+
+      startCooldown() {
+        this.cooldown = true;
+        setTimeout(() => {
+          this.cooldown = false;
+        }, 1500);
+      }
+    }
+
+    class Fireball extends GameObject {
+      constructor(x, y) {
+        super(x, y, 20, 10, 'orange');
+      }
+      update() {
+        this.x += 5;
+      }
+    }
+
+    class TailWhip extends GameObject {
+      constructor(parent) {
+        super(parent.x - 50, parent.y, parent.width * 2, parent.height * 2, null);
+        this.parent = parent;
+        this.active = false;
+        this.timer = 0;
+      }
+      update() {
+        this.x = this.parent.x - 50;
+        this.y = this.parent.y;
+      }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 0, 0, 1)';
+      }
+    }
+
+
+    const player1 = new GameObject(100, 300, 50, 50, 'red', 0);
+    const player2 = new GameObject(700, 300, 50, 50, 'blue', 0);
+    const dinosaur = new GameObject(350, 250, 100, 100, 'green', 25);
+    const dragon = new GameObject(400, 100, 100, 100, 'purple', 20);
+    
+    const fireballs = [];
+    const tailWhip = new TailWhip(dinosaur);
+
+    function checkCollisions() {
+      fireballs.forEach((fireball, i) => {
+        if (fireball.checkCollision(dinosaur)) {
+          fireballs.splice(i, 1);
+          dinosaur.health -= 10;
+          const direction = fireball.x > dinosaur.x ? 'left' : 'right';
+          dinosaur.knockback(direction, 50);
+        }
+      });
+      if (tailWhip.active && tailWhip.checkCollision(dragon)) {
+       dragon.health -= 10;
+       const direction = tailWhip.x > dragon.x ? 'left' : 'right';
+       dragon.knockback(direction, 50);
+       tailWhip.active = false;
+      }
+    }
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      dinosaur.drawHealthBar();
+      dragon.drawHealthBar();
+      fireballs.forEach((fireball) => {
+        fireball.update();
+        fireball.draw();
+      });
+      tailWhip.update();
+      if (tailWhip.active) {
+        tailWhip.draw();
+      }
+      dinosaur.draw('🦖');
+      dragon.draw('🐉');
+
+      checkCollisions();
+      
+      if (!gameOver) {
+        if (dinosaur.health <= 0) {
+          gameOver = true;
+          dinosaur.alive = false;
+          alert('GAME OVER! Congratulations, Dragon wins!');
+        }
+        if (dragon.health <= 0) {
+          gameOver = true;
+          dragon.alive = false;
+          alert('GAME OVER! Congratulations, Dinosaur wins!');
+        }
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      switch (e.code) {
+        case 'ArrowUp':
+          dinosaur.move('up');
+          break;
+        case 'ArrowDown':
+          dinosaur.move('down');
+          break;
+        case 'ArrowLeft':
+          dinosaur.move('left');
+          break;
+        case 'ArrowRight':
+          dinosaur.move('right');
+          break;
+        case 'KeyW':
+          dragon.move('up');
+          break;
+        case 'KeyS':
+          dragon.move('down');
+          break;
+        case 'KeyA':
+          dragon.move('left');
+          break;
+        case 'KeyD':
+          dragon.move('right');
+          break;
+        case 'KeyE':
+          if (!dragon.cooldown) {
+            fireballs.push(new Fireball(dragon.x + dragon.width, dragon.y + dragon.height / 2));
+            dragon.startCooldown();
+          }
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          if (!dinosaur.cooldown) {
+            tailWhip.active = true;
+            setTimeout(() => tailWhip.active = false, 250);
+            dinosaur.startCooldown();
+          }
+          break;
+        default:
+          break;
+      }
+    });
+    
+    let gameOver = false;
+
+    gameLoop();
+  </script>
+</body>
+</html>
